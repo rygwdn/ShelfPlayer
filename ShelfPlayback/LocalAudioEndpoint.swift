@@ -121,6 +121,7 @@ final class LocalAudioEndpoint: AudioEndpoint {
     private var allowUpNextQueueGeneration: Bool
     
     let audioPlayerVolume: Float = 1
+    let gainContext = GainContext(gain: Float(Defaults[.audioGain]))
     
     init(_ item: AudioPlayerItem) async throws {
         logger.info("Starting up local audio endpoint with item ID \(item.itemID)")
@@ -235,13 +236,24 @@ final class LocalAudioEndpoint: AudioEndpoint {
         }
         set {
             audioPlayer.defaultRate = Float(newValue)
-            
+
             if audioPlayer.rate > 0 {
                 audioPlayer.rate = audioPlayer.defaultRate
             }
-            
+
             Task {
                 await AudioPlayer.shared.playbackRateDidChange(endpointID: id, playbackRate: newValue)
+            }
+        }
+    }
+    var gain: Percentage {
+        get { Defaults[.audioGain] }
+        set {
+            let clamped = min(2.0, max(0.25, newValue))
+            Defaults[.audioGain] = clamped
+            gainContext.gain = Float(clamped)
+            Task {
+                await AudioPlayer.shared.gainDidChange(endpointID: id, gain: clamped)
             }
         }
     }
@@ -363,6 +375,9 @@ extension LocalAudioEndpoint {
     func setPlaybackRate(_ rate: Percentage) {
         playbackRate = rate
         updatePeriodicObserver()
+    }
+    func setGain(_ gain: Percentage) {
+        self.gain = gain
     }
     
     func beginSeeking(_ forwards: Bool) async {
@@ -771,8 +786,16 @@ private extension LocalAudioEndpoint {
                 "AVURLAssetHTTPHeaderFieldsKey": headers ?? [:],
             ])
             let playerItem = AVPlayerItem(asset: asset)
-            
+
             audioPlayer.insert(playerItem, after: nil)
+
+            let capturedItem = playerItem
+            let capturedContext = gainContext
+            Task {
+                if let mix = await makeGainAudioMix(for: capturedItem, context: capturedContext) {
+                    capturedItem.audioMix = mix
+                }
+            }
         }
     }
     func updateUpNextQueue(using forced: ResolvedUpNextStrategy? = nil) {

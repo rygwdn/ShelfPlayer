@@ -12560,6 +12560,36 @@
         }
       }
     },
+    "preferences.gain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume Gain"
+          }
+        }
+      }
+    },
+    "preferences.gain.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjusts software volume independently of the system volume. Values above 100% amplify audio and may cause clipping in loud content."
+          }
+        }
+      }
+    },
+    "preferences.gain.adjustment %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust by %@"
+          }
+        }
+      }
+    },
     "preferences.playbackRate" : {
       "localizations" : {
         "de" : {

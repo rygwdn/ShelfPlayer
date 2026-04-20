@@ -67,6 +67,9 @@ public extension Defaults.Keys {
     
     static let playbackRateAdjustmentUp = Key<Percentage>("playbackRateAdjustmentUp", default: 0.1)
     static let playbackRateAdjustmentDown = Key<Percentage>("playbackRateAdjustmentDown", default: 0.1)
+
+    static let audioGain = Key<Percentage>("audioGain", default: 1.0)
+    static let audioGainAdjustment = Key<Percentage>("audioGainAdjustment", default: 0.05)
     
     static let sleepTimerIntervals = Key("sleepTimerIntervals", default: [5, 10, 15, 20, 25, 30, 45, 60, 75, 90].map { Double($0) * 60 })
     static let sleepTimerExtendInterval = Key("sleepTimerExtendInterval", default: Double(1200))
@@ -247,6 +250,7 @@ public extension RFNotification.IsolatedNotification {
     
     static var volumeChanged: IsolatedNotification<Percentage> { .init("io.rfk.shelfPlayerKit.volumeChanged") }
     static var playbackRateChanged: IsolatedNotification<Percentage> { .init("io.rfk.shelfPlayerKit.playbackRateChanged") }
+    static var gainChanged: IsolatedNotification<Percentage> { .init("io.rfk.shelfPlayerKit.gainChanged") }
     
     static var queueChanged: IsolatedNotification<[ItemIdentifier]> { .init("io.rfk.shelfPlayerKit.queueChanged") }
     static var upNextQueueChanged: IsolatedNotification<[ItemIdentifier]> { .init("io.rfk.shelfPlayerKit.upNextQueueChanged") }

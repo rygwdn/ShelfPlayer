@@ -367,9 +367,11 @@ struct PlaybackMenuActions: View {
 struct PlaybackRateButton: View {
     @Environment(PlaybackViewModel.self) private var viewModel
     @Environment(Satellite.self) private var satellite
-    
+
     @Default(.playbackRates) private var playbackRates
-    
+
+    private static let gainPresets: [Percentage] = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
+
     var body: some View {
         Menu {
             ForEach(playbackRates, id: \.hashValue) { value in
@@ -377,21 +379,44 @@ struct PlaybackRateButton: View {
                     if $0 {
                         satellite.setPlaybackRate(value)
                     }
-                    
+
                 }) {
                     Text(value, format: .playbackRate)
                 }
             }
-            
+
             Divider()
-        
+
             ControlGroup {
                 Button("action.decrease", systemImage: "minus") {
-                    adjust(up: false)
+                    adjustRate(up: false)
                 }
-                
+
                 Button("action.increase", systemImage: "plus") {
-                    adjust(up: true)
+                    adjustRate(up: true)
+                }
+            }
+
+            Divider()
+
+            ForEach(Self.gainPresets, id: \.self) { value in
+                Toggle(isOn: .init(
+                    get: { abs(satellite.gain - value) < 0.01 },
+                    set: { if $0 { satellite.setGain(value) } }
+                )) {
+                    Text(value, format: .percent.precision(.fractionLength(0)))
+                }
+            }
+
+            Divider()
+
+            ControlGroup {
+                Button("action.decrease", systemImage: "minus") {
+                    adjustGain(up: false)
+                }
+
+                Button("action.increase", systemImage: "plus") {
+                    adjustGain(up: true)
                 }
             }
         } label: {
@@ -418,9 +443,14 @@ struct PlaybackRateButton: View {
         .menuActionDismissBehavior(.disabled)
     }
     
-    private func adjust(up: Bool) {
+    private func adjustRate(up: Bool) {
         let adjustment = up ? Defaults[.playbackRateAdjustmentUp] : -Defaults[.playbackRateAdjustmentDown]
         satellite.setPlaybackRate(satellite.playbackRate + adjustment)
+    }
+
+    private func adjustGain(up: Bool) {
+        let step = Defaults[.audioGainAdjustment]
+        satellite.setGain(satellite.gain + (up ? step : -step))
     }
 }
 struct PlaybackSleepTimerButton: View {

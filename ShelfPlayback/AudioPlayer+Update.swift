@@ -95,6 +95,14 @@ extension AudioPlayer {
         await RFNotification[.volumeChanged].send(payload: volume)
     }
     
+    func gainDidChange(endpointID: UUID, gain: Percentage) async {
+        if current != nil && current?.id != endpointID {
+            return
+        }
+
+        await RFNotification[.gainChanged].send(payload: gain)
+    }
+
     func playbackRateDidChange(endpointID: UUID, playbackRate: Percentage) async {
         if current != nil && current?.id != endpointID {
             return

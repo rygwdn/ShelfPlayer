@@ -58,6 +58,9 @@ struct PreferencesView: View {
                     NavigationLink(destination: PlaybackRateEditor()) {
                         label("preferences.playbackRate", systemImage: "percent", color: .blue)
                     }
+                    NavigationLink(destination: GainEditor()) {
+                        label("preferences.gain", systemImage: "speaker.wave.2", color: .green)
+                    }
                     NavigationLink(destination: SleepTimerEditor()) {
                         label("preferences.sleepTimer", systemImage: "clock", color: .orange)
                     }
