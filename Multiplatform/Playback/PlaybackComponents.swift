@@ -371,6 +371,7 @@ struct PlaybackRateButton: View {
     @Default(.playbackRates) private var playbackRates
 
     private static let gainPresets: [Percentage] = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
+    private static let vocalBoostPresets: [Percentage] = [0, 3, 6, 9, 12]
 
     var body: some View {
         Menu {
@@ -419,6 +420,33 @@ struct PlaybackRateButton: View {
                     adjustGain(up: true)
                 }
             }
+
+            Divider()
+
+            ForEach(Self.vocalBoostPresets, id: \.self) { value in
+                Toggle(isOn: .init(
+                    get: { abs(satellite.vocalBoost - value) < 0.5 },
+                    set: { if $0 { satellite.setVocalBoost(value) } }
+                )) {
+                    if value == 0 {
+                        Text("playback.vocalBoost.off")
+                    } else {
+                        Text("+\(Int(value)) dB")
+                    }
+                }
+            }
+
+            Divider()
+
+            ControlGroup {
+                Button("action.decrease", systemImage: "minus") {
+                    adjustVocalBoost(up: false)
+                }
+
+                Button("action.increase", systemImage: "plus") {
+                    adjustVocalBoost(up: true)
+                }
+            }
         } label: {
             HStack(spacing: 0) {
                 Text(satellite.playbackRate, format: .playbackRate.hideX())
@@ -451,6 +479,11 @@ struct PlaybackRateButton: View {
     private func adjustGain(up: Bool) {
         let step = Defaults[.audioGainAdjustment]
         satellite.setGain(satellite.gain + (up ? step : -step))
+    }
+
+    private func adjustVocalBoost(up: Bool) {
+        let step = Defaults[.audioVocalBoostAdjustment]
+        satellite.setVocalBoost(satellite.vocalBoost + (up ? step : -step))
     }
 }
 struct PlaybackSleepTimerButton: View {

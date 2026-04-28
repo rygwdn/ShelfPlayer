@@ -12580,6 +12580,36 @@
         }
       }
     },
+    "preferences.vocalBoost" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vocal Boost"
+          }
+        }
+      }
+    },
+    "preferences.vocalBoost.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boosts the 2500 Hz presence range where speech clarity and consonants live. Useful for quiet or muffled recordings."
+          }
+        }
+      }
+    },
+    "playback.vocalBoost.off" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        }
+      }
+    },
     "preferences.gain.adjustment %@" : {
       "localizations" : {
         "en" : {

@@ -90,6 +90,11 @@ public extension AudioPlayer {
             await current?.gain ?? Defaults[.audioGain]
         }
     }
+    var vocalBoost: Percentage {
+        get async {
+            await current?.vocalBoost ?? Defaults[.audioVocalBoost]
+        }
+    }
     
     var duration: TimeInterval? {
         get async {
@@ -260,6 +265,9 @@ public extension AudioPlayer {
     }
     func setGain(_ gain: Percentage) async {
         await current?.setGain(gain)
+    }
+    func setVocalBoost(_ boost: Percentage) async {
+        await current?.setVocalBoost(boost)
     }
     func setPlaybackRate(_ rate: Percentage) async {
         await current?.setPlaybackRate(rate)

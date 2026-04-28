@@ -12,6 +12,9 @@ struct GainEditor: View {
     @Default(.audioGain) private var audioGain
     @Default(.audioGainAdjustment) private var audioGainAdjustment
 
+    @Default(.audioVocalBoost) private var audioVocalBoost
+    @Default(.audioVocalBoostAdjustment) private var audioVocalBoostAdjustment
+
     var body: some View {
         List {
             Section {
@@ -34,10 +37,36 @@ struct GainEditor: View {
             }
 
             Section {
+                Stepper(value: $audioVocalBoost, in: 0.0...12.0, step: audioVocalBoostAdjustment) {
+                    if audioVocalBoost == 0 {
+                        Text("playback.vocalBoost.off")
+                    } else {
+                        Text("+\(Int(audioVocalBoost)) dB")
+                    }
+                }
+                .onChange(of: audioVocalBoost) { _, newValue in
+                    Task {
+                        await AudioPlayer.shared.setVocalBoost(newValue)
+                    }
+                }
+            } header: {
+                Text("preferences.vocalBoost")
+            } footer: {
+                Text("preferences.vocalBoost.footer")
+            }
+
+            Section {
+                Stepper(value: $audioVocalBoostAdjustment, in: 0.5...3.0, step: 0.5) {
+                    Text("preferences.gain.adjustment \(Int(audioVocalBoostAdjustment)) dB")
+                }
+            }
+
+            Section {
                 Button("action.reset", role: .destructive) {
-                    Defaults.reset([.audioGain, .audioGainAdjustment])
+                    Defaults.reset([.audioGain, .audioGainAdjustment, .audioVocalBoost, .audioVocalBoostAdjustment])
                     Task {
                         await AudioPlayer.shared.setGain(Defaults[.audioGain])
+                        await AudioPlayer.shared.setVocalBoost(Defaults[.audioVocalBoost])
                     }
                 }
             }

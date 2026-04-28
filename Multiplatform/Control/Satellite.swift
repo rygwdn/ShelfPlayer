@@ -44,6 +44,7 @@ final class Satellite {
     private(set) var volume = 0.0
     private(set) var playbackRate = 0.0
     private(set) var gain: Percentage = Defaults[.audioGain]
+    private(set) var vocalBoost: Percentage = Defaults[.audioVocalBoost]
     
     private(set) var route: AudioRoute?
     private(set) var sleepTimer: SleepTimerConfiguration?
@@ -668,6 +669,13 @@ extension Satellite {
         }
     }
 
+    func setVocalBoost(_ boost: Percentage) {
+        Task {
+            await AudioPlayer.shared.setVocalBoost(boost)
+            notifySuccess.toggle()
+        }
+    }
+
     func setPlaybackRate(_ rate: Percentage) {
         Task {
             await AudioPlayer.shared.setPlaybackRate(rate)
@@ -1040,6 +1048,9 @@ private extension Satellite {
         RFNotification[.gainChanged].subscribe { [weak self] gain in
             self?.gain = gain
         }.store(in: &stash)
+        RFNotification[.vocalBoostChanged].subscribe { [weak self] boost in
+            self?.vocalBoost = boost
+        }.store(in: &stash)
         
         RFNotification[.routeChanged].subscribe { [weak self] route in
             self?.route = route
@@ -1132,6 +1143,7 @@ private extension Satellite {
         
         playbackRate = await AudioPlayer.shared.playbackRate
         gain = await AudioPlayer.shared.gain
+        vocalBoost = await AudioPlayer.shared.vocalBoost
         
         route = await AudioPlayer.shared.route
         sleepTimer = await AudioPlayer.shared.sleepTimer

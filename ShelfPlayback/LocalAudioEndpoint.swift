@@ -121,7 +121,10 @@ final class LocalAudioEndpoint: AudioEndpoint {
     private var allowUpNextQueueGeneration: Bool
     
     let audioPlayerVolume: Float = 1
-    let gainContext = GainContext(gain: Float(Defaults[.audioGain]))
+    let audioProcessingContext = AudioProcessingContext(
+        gain: Float(Defaults[.audioGain]),
+        vocalBoost: Float(Defaults[.audioVocalBoost])
+    )
     
     init(_ item: AudioPlayerItem) async throws {
         logger.info("Starting up local audio endpoint with item ID \(item.itemID)")
@@ -251,9 +254,21 @@ final class LocalAudioEndpoint: AudioEndpoint {
         set {
             let clamped = min(2.0, max(0.25, newValue))
             Defaults[.audioGain] = clamped
-            gainContext.gain = Float(clamped)
+            audioProcessingContext.gain = Float(clamped)
             Task {
                 await AudioPlayer.shared.gainDidChange(endpointID: id, gain: clamped)
+            }
+        }
+    }
+    var vocalBoost: Percentage {
+        get { Defaults[.audioVocalBoost] }
+        set {
+            let clamped = min(12.0, max(0.0, newValue))
+            Defaults[.audioVocalBoost] = clamped
+            audioProcessingContext.vocalBoost = Float(clamped)
+            audioProcessingContext.updateVocalBoostCoefficients()
+            Task {
+                await AudioPlayer.shared.vocalBoostDidChange(endpointID: id, vocalBoost: clamped)
             }
         }
     }
@@ -378,6 +393,9 @@ extension LocalAudioEndpoint {
     }
     func setGain(_ gain: Percentage) {
         self.gain = gain
+    }
+    func setVocalBoost(_ boost: Percentage) {
+        self.vocalBoost = boost
     }
     
     func beginSeeking(_ forwards: Bool) async {
@@ -790,9 +808,9 @@ private extension LocalAudioEndpoint {
             audioPlayer.insert(playerItem, after: nil)
 
             let capturedItem = playerItem
-            let capturedContext = gainContext
+            let capturedContext = audioProcessingContext
             Task {
-                if let mix = await makeGainAudioMix(for: capturedItem, context: capturedContext) {
+                if let mix = await makeAudioMix(for: capturedItem, context: capturedContext) {
                     capturedItem.audioMix = mix
                 }
             }
