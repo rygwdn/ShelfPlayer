@@ -1,0 +1,50 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build iOS App
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Create Debug Configuration
+        run: |
+          {
+            echo '#include "Base.xcconfig"'
+            echo ''
+            echo 'DEVELOPMENT_TEAM = '
+            echo 'BUNDLE_ID_PREFIX = com.ci'
+            echo 'BUNDLE_ID_SUFFIX = shelfplayer'
+            echo ''
+            echo 'ENTITLEMENT_BASE = FREE_DEVELOPER_ACCOUNT'
+            echo 'SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG'
+          } > Configuration/Debug.xcconfig
+
+      - name: Resolve Swift Packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project ShelfPlayer.xcodeproj \
+            -scheme Multiplatform
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -project ShelfPlayer.xcodeproj \
+            -scheme Multiplatform \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
