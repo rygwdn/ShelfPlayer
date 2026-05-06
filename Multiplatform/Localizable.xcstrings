@@ -12560,6 +12560,66 @@
         }
       }
     },
+    "preferences.gain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume Gain"
+          }
+        }
+      }
+    },
+    "preferences.gain.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjusts software volume independently of the system volume. Values above 100% amplify audio and may cause clipping in loud content."
+          }
+        }
+      }
+    },
+    "preferences.vocalBoost" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vocal Boost"
+          }
+        }
+      }
+    },
+    "preferences.vocalBoost.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boosts the 2500 Hz presence range where speech clarity and consonants live. Useful for quiet or muffled recordings."
+          }
+        }
+      }
+    },
+    "playback.vocalBoost.off" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        }
+      }
+    },
+    "preferences.gain.adjustment %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust by %@"
+          }
+        }
+      }
+    },
     "preferences.playbackRate" : {
       "localizations" : {
         "de" : {

@@ -26,6 +26,8 @@ protocol AudioEndpoint: Identifiable, Sendable {
     
     var volume: Percentage { get async }
     var playbackRate: Percentage { get async }
+    var gain: Percentage { get async }
+    var vocalBoost: Percentage { get async }
     
     var duration: TimeInterval? { get async }
     var currentTime: TimeInterval? { get async }
@@ -49,6 +51,8 @@ protocol AudioEndpoint: Identifiable, Sendable {
     
     func setVolume(_ volume: Percentage) async
     func setPlaybackRate(_ rate: Percentage) async
+    func setGain(_ gain: Percentage) async
+    func setVocalBoost(_ boost: Percentage) async
     
     func beginSeeking(_ forwards: Bool) async
     func endSeeking() async
