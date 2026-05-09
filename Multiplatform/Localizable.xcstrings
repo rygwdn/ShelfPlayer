@@ -15440,52 +15440,6 @@
         }
       }
     },
-    "warning.playbackDownload.activePlayback" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Objekt, das heruntergeladen werden soll, wird gerade abgespielt. Wiedergabe beenden und Download starten?"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The item you tried to download is currently being played. End playback and begin download?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L'élément que vous essayez de télécharger est en cours de lecture. Voulez-vous arrêter la lecture et commencer le téléchargement?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Объект, который Вы пытаетесь скачать сейчас воспроизводится. Прервать воспроизведение или начать загрузку?"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Objektet du försökte ladda ned spelas för närvarande. Avbryt uppspelningen och påbörja nedladdningen?"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Елемент, який ви намагаєтеся завантажити, наразі відтворюється. Завершити відтворення та почати завантаження?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "您尝试下载的项目当前正在播放。是否结束播放并开始下载？"
-          }
-        }
-      }
-    },
     "warning.playbackDownload.removeDownload" : {
       "localizations" : {
         "de" : {

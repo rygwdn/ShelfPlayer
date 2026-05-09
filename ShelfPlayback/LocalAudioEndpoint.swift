@@ -939,6 +939,24 @@ private extension LocalAudioEndpoint {
         RFNotification[.accessTokenExpired].subscribe { [weak self] connectionID in
             self?.repopulateQueueTrigger(connectionID: connectionID)
         }
+        RFNotification[.downloadStatusChanged].subscribe { [weak self] payload in
+            guard let self,
+                  let (itemID, status) = payload,
+                  itemID == currentItemID,
+                  status == .completed,
+                  let currentTime else { return }
+
+            Task { @MainActor in
+                do {
+                    let localTracks = try await PersistenceManager.shared.download.audioTracks(for: itemID)
+                    self.audioTracks = localTracks.sorted()
+                    try await self.repopulateAudioPlayerQueue(start: self.activeAudioTrackIndex)
+                    try await self.seek(to: currentTime, insideChapter: false)
+                } catch {
+                    self.logger.warning("Failed to switch to local playback after download: \(error)")
+                }
+            }
+        }
         
         RFNotification[.collectionChanged].subscribe { [weak self] collectionID in
             guard self?.upNextStrategy?.itemID == collectionID else {
