@@ -79,6 +79,10 @@ public extension Defaults.Keys {
     
     static let enableConvenienceDownloads = Key("enableConvenienceDownloads", default: true)
     static let enableListenNowDownloads = Key("enableListenNowDownloads", default: false)
+
+    static let enablePlaybackTriggeredDownloads = Key("enablePlaybackTriggeredDownloads", default: false)
+    static let playbackDownloadTriggerDuration = Key("playbackDownloadTriggerDuration", default: 60)    // seconds
+    static let playbackDownloadNearEndThreshold = Key("playbackDownloadNearEndThreshold", default: 600) // seconds; 0 = disabled
     
     static let listenTimeTarget = Key<Int>("listenTimeTarget", default: 30, suite: .shared)
     

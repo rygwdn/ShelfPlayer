@@ -11,6 +11,7 @@ import OSLog
 import RFNotifications
 
 private let LISTEN_NOW_CONFIGURATION_ID = "listen-now"
+private let PLAYBACK_TRIGGERED_CONFIGURATION_ID = "playback-triggered"
 
 private let RETRIEVALS_KEY_VALUE_CLUSTER = "convenienceDownloadRetrievals"
 private let DOWNLOADED_KEY_VALUE_CLUSTER = "downloadedItemIDs"
@@ -24,8 +25,18 @@ extension PersistenceManager {
         
         var task: Task<Void, Never>?
         var pendingConfigurationIDs = Set<String>()
-        
+
         nonisolated(unsafe) var shouldComeToEnd = false
+
+        // Playback-triggered download state
+        var currentPlayingItemID: ItemIdentifier?
+        var accumulatedListeningTime: TimeInterval = 0
+        var listenStartDate: Date?
+        var hasTriggeredCurrentItemDownload = false
+        var currentDuration: TimeInterval?
+        var hasTriggeredNextItemDownload = false
+        var primaryQueueItemIDs: [ItemIdentifier] = []
+        var upNextQueueItemIDs: [ItemIdentifier] = []
         
         init() {
             RFNotification[.listenNowItemsChanged].subscribe { [weak self] in
@@ -48,10 +59,18 @@ extension PersistenceManager {
                 }
             }
             Task {
-                for await _ in Defaults.updates([.enableConvenienceDownloads, .enableListenNowDownloads], initial: false) {
+                for await _ in Defaults.updates([.enableConvenienceDownloads, .enableListenNowDownloads, .enablePlaybackTriggeredDownloads], initial: false) {
                     await RFNotification[.convenienceDownloadConfigurationsChanged].send()
                 }
             }
+            Task {
+                for await enabled in Defaults.updates(.enablePlaybackTriggeredDownloads, initial: false) {
+                    if !enabled {
+                        await purgePlaybackTriggeredDownloads()
+                    }
+                }
+            }
+            setupPlaybackObservers()
             
             RFNotification[.progressEntityUpdated].subscribe { [weak self] connectionID, primaryID, groupingID, entity in
                 Task {
@@ -167,6 +186,9 @@ private extension PersistenceManager.ConvenienceDownloadSubsystem {
                 // Listen-now membership is volatile while progress and connectivity fluctuate.
                 // Pruning here causes remove/re-download loops.
                 shouldPruneOrphans = false
+            case .playbackTriggered:
+                // Items are added one-by-one reactively; batch orphan logic doesn't apply.
+                shouldPruneOrphans = false
             case .grouping:
                 shouldPruneOrphans = true
         }
@@ -250,11 +272,15 @@ private extension PersistenceManager.ConvenienceDownloadSubsystem {
         if id == LISTEN_NOW_CONFIGURATION_ID {
             return .listenNow
         }
-        
+
+        if id == PLAYBACK_TRIGGERED_CONFIGURATION_ID {
+            return .playbackTriggered
+        }
+
         if let itemID = resolveItemID(from: id), let retrieval = await PersistenceManager.shared.keyValue[.convenienceDownloadRetrieval(configurationID: id)] {
             return .grouping(itemID, retrieval)
         }
-        
+
         throw ConvenienceDownloadError.notFound
     }
 }
@@ -327,11 +353,15 @@ public extension PersistenceManager.ConvenienceDownloadSubsystem {
             guard Defaults[.enableConvenienceDownloads] else {
                 return []
             }
-            
+
             var configurations = [ConvenienceDownloadConfiguration]()
-            
+
             if Defaults[.enableListenNowDownloads] {
                 configurations.append(.listenNow)
+            }
+
+            if Defaults[.enablePlaybackTriggeredDownloads] {
+                configurations.append(.playbackTriggered)
             }
             
             let retrievals = await PersistenceManager.shared.keyValue.entities(cluster: RETRIEVALS_KEY_VALUE_CLUSTER, type: GroupingRetrieval.self)
@@ -550,29 +580,36 @@ public extension PersistenceManager.ConvenienceDownloadSubsystem {
     
     enum ConvenienceDownloadConfiguration: Codable, Sendable, Identifiable {
         case listenNow
+        case playbackTriggered
         case grouping(ItemIdentifier, GroupingRetrieval)
-        
+
         public var id: String {
             switch self {
                 case .listenNow:
                     LISTEN_NOW_CONFIGURATION_ID
+                case .playbackTriggered:
+                    PLAYBACK_TRIGGERED_CONFIGURATION_ID
                 case .grouping(let itemID, _):
                     buildGroupingConfigurationID(itemID)
             }
         }
-        
+
         func disable() async throws {
             switch self {
                 case .listenNow:
                     Defaults[.enableListenNowDownloads] = false
+                case .playbackTriggered:
+                    Defaults[.enablePlaybackTriggeredDownloads] = false
                 case .grouping(let itemID, _):
                     try await PersistenceManager.shared.convenienceDownload.setRetrieval(for: itemID, retrieval: nil)
             }
         }
-        
+
         var items: [PlayableItem] {
             get async throws {
                 switch self {
+                    case .playbackTriggered:
+                        return []
                     case .grouping(let itemID, let retrieval):
                         let strategy: ResolvedUpNextStrategy
                         
