@@ -108,6 +108,23 @@ jobs:
           echo "APP_PROFILE_UUID=$APP_UUID" >> "$GITHUB_ENV"
           echo "WIDGETS_PROFILE_UUID=$WIDGETS_UUID" >> "$GITHUB_ENV"
 
+      - name: Create Release Configuration
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID || 'N8AA4S3S96' }}
+          BUNDLE_ID_PREFIX: ${{ secrets.APPLE_BUNDLE_ID_PREFIX || 'io.rfk' }}
+          KEYCHAIN_GROUP: ${{ secrets.KEYCHAIN_GROUP_SUFFIX || 'ShelfPlayer' }}
+        run: |
+          {
+            echo '#include "Base.xcconfig"'
+            echo ''
+            echo "DEVELOPMENT_TEAM = $TEAM_ID"
+            echo "BUNDLE_ID_PREFIX = $BUNDLE_ID_PREFIX"
+            echo 'BUNDLE_ID_SUFFIX = shelfplayer'
+            echo ''
+            echo "KEYCHAIN_GROUP_SUFFIX = $KEYCHAIN_GROUP"
+            echo 'SWIFT_ACTIVE_COMPILATION_CONDITIONS = ENABLE_CENTRALIZED'
+          } > Configuration/Release.xcconfig
+
       - name: Install App Store Connect API Key
         env:
           ASC_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
@@ -117,6 +134,9 @@ jobs:
           echo "$ASC_API_KEY_BASE64" | base64 -d > ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
 
       - name: Create Export Options
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID || 'N8AA4S3S96' }}
+          BUNDLE_ID_PREFIX: ${{ secrets.APPLE_BUNDLE_ID_PREFIX || 'io.rfk' }}
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" << EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -126,16 +146,16 @@ jobs:
               <key>method</key>
               <string>app-store-connect</string>
               <key>teamID</key>
-              <string>N8AA4S3S96</string>
+              <string>$TEAM_ID</string>
               <key>signingStyle</key>
               <string>manual</string>
               <key>uploadSymbols</key>
               <true/>
               <key>provisioningProfiles</key>
               <dict>
-                  <key>io.rfk.shelfplayer</key>
+                  <key>$BUNDLE_ID_PREFIX.shelfplayer</key>
                   <string>$APP_PROFILE_UUID</string>
-                  <key>io.rfk.shelfplayer.Widgets</key>
+                  <key>$BUNDLE_ID_PREFIX.shelfplayer.Widgets</key>
                   <string>$WIDGETS_PROFILE_UUID</string>
               </dict>
           </dict>
