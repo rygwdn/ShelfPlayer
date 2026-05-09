@@ -599,16 +599,12 @@ public extension PersistenceManager.DownloadSubsystem {
             throw PersistenceError.existing
         }
         
-        guard !blocked.keys.contains(itemID) else {
-            throw PersistenceError.blocked
-        }
-        
         guard !busy.contains(itemID) else {
             throw PersistenceError.busy
         }
-        
+
         busy.insert(itemID)
-        
+
         let task = await UIApplication.shared.beginBackgroundTask(withName: "download::\(itemID)")
         
         do {

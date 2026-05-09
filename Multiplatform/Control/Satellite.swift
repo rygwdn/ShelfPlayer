@@ -230,7 +230,6 @@ extension Satellite {
         case message(String)
         
         case playbackStartWhileDownloading(ItemIdentifier)
-        case downloadStartWhilePlaying
         case downloadRemoveWhilePlaying
         
         case convenienceDownloadManaged(ItemIdentifier)
@@ -244,8 +243,6 @@ extension Satellite {
                     
                 case .playbackStartWhileDownloading:
                     String(localized: "warning.playbackDownload.activeDownload")
-                case .downloadStartWhilePlaying:
-                    String(localized: "warning.playbackDownload.activePlayback")
                 case .downloadRemoveWhilePlaying:
                     String(localized: "warning.playbackDownload.removeDownload")
                     
@@ -262,7 +259,7 @@ extension Satellite {
                 case .message:
                     [.dismiss]
                     
-                case .playbackStartWhileDownloading, .downloadStartWhilePlaying, .downloadRemoveWhilePlaying:
+                case .playbackStartWhileDownloading, .downloadRemoveWhilePlaying:
                     [.cancel, .proceed]
                     
                 case .convenienceDownloadManaged(let itemID):
@@ -369,14 +366,6 @@ extension Satellite {
                     }
                     
                     start(itemID)
-                case .downloadStartWhilePlaying:
-                    guard let nowPlayingItemID else {
-                        notifyError.toggle()
-                        return
-                    }
-                    
-                    await AudioPlayer.shared.stop()
-                    download(itemID: nowPlayingItemID)
                 case .downloadRemoveWhilePlaying:
                     guard let nowPlayingItemID else {
                         notifyError.toggle()
@@ -846,10 +835,6 @@ extension Satellite {
                 return
             }
 
-            guard await AudioPlayer.shared.currentItemID != itemID else {
-                warn(.downloadStartWhilePlaying)
-                return
-            }
             startWorking(on: itemID)
 
             do {
