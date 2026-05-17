@@ -12850,6 +12850,146 @@
         }
       }
     },
+    "preferences.playbackTriggeredDownload" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playback Downloads"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.enable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download While Listening"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ShelfPlayer will download the book you're listening to after a set time, and can pre-download the next book when you're nearing the end. Downloaded books are removed automatically when finished if \"Remove Finished Downloads\" is enabled."
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.nearEnd" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pre-Download Next Book"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.nearEnd.10m" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 minutes remaining"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.nearEnd.15m" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "15 minutes remaining"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.nearEnd.30m" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 minutes remaining"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.nearEnd.5m" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5 minutes remaining"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.nearEnd.disabled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disabled"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.triggerDuration" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download After"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.triggerDuration.1m" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 minute"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.triggerDuration.2m" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 minutes"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.triggerDuration.30s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 seconds"
+          }
+        }
+      }
+    },
+    "preferences.playbackTriggeredDownload.triggerDuration.5m" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5 minutes"
+          }
+        }
+      }
+    },
     "preferences.purge.cache" : {
       "localizations" : {
         "de" : {
