@@ -33,12 +33,6 @@ jobs:
             echo 'SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG'
           } > Configuration/Debug.xcconfig
 
-      - name: Resolve Swift Packages
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -project ShelfPlayer.xcodeproj \
-            -scheme Multiplatform
-
       - name: Build
         run: |
           xcodebuild build \
@@ -46,6 +40,8 @@ jobs:
             -scheme Multiplatform \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
+            -skipMacroValidation \
+            -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
@@ -169,7 +165,9 @@ jobs:
             -scheme Multiplatform \
             -destination 'generic/platform=iOS' \
             -configuration Release \
-            -archivePath "$RUNNER_TEMP/ShelfPlayer.xcarchive"
+            -archivePath "$RUNNER_TEMP/ShelfPlayer.xcarchive" \
+            -skipMacroValidation \
+            -skipPackagePluginValidation
 
       - name: Export IPA
         run: |
