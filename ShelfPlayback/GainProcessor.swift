@@ -38,7 +38,7 @@ struct BiquadCoefficients {
 // MARK: - Shared parameter context (main-thread writes, real-time thread reads)
 
 // Owned by LocalAudioEndpoint. All taps hold a strong reference via TapState.
-final class AudioProcessingContext {
+final class AudioProcessingContext: @unchecked Sendable {
     var gain: Float
     var vocalBoost: Float               // dB; 0 = off
     var sampleRate: Float               // set from the first prepare callback
