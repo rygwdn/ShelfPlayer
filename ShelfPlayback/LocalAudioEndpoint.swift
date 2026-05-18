@@ -503,65 +503,89 @@ private extension LocalAudioEndpoint {
         
         let entity = await PersistenceManager.shared.progress[currentItemID]
         
-        do {
-            if !OfflineMode.shared.isAvailable(currentItemID.connectionID) {
-                throw AudioPlayerError.offline
-            }
-            
-            // Attempt to start a playback session
-            
-            let suggestedStartTime: TimeInterval
-            (audioTracks, chapters, suggestedStartTime, sessionID) = try await ABSClient[currentItemID.connectionID].startPlaybackSession(itemID: currentItemID)
-            
+        if downloadStatus == .completed {
+            // Fast path: all data is available locally — start immediately and fetch the server session in the background.
             let entityCurrentTime = entity.isFinished ? 0 : entity.currentTime
-            let delta = abs(entityCurrentTime - suggestedStartTime)
-            
-            if delta > 60 {
-                logger.warning("Server suggested a playback start time of \(suggestedStartTime), but our local state indicates \(entityCurrentTime). This may cause playback to skip or rewind. Using whichever is greater.")
-                startTime = max(entityCurrentTime, suggestedStartTime)
-            } else {
-                startTime = suggestedStartTime
+            var localStartTime = entityCurrentTime
+            if Defaults[.enableSmartRewind] && entity.lastUpdate.distance(to: Date()) >= 10 * 60 {
+                localStartTime = max(localStartTime - 30, 0)
             }
-            
-            logger.info("Computed start time: \(startTime) (server suggested: \(suggestedStartTime), local entity: \(entityCurrentTime) | \(entity.progress) | \(entity.lastUpdate)")
-            
-            Defaults[.openPlaybackSessions].append(OpenPlaybackSessionPayload(sessionID: sessionID!, itemID: currentItemID))
-        } catch {
-            // Fall back to resolving and reporting locally
-            if entity.isFinished {
-                startTime = 0
-            } else {
-                var currentTime = entity.currentTime
-                
-                // 10 minutes
-                if Defaults[.enableSmartRewind] && entity.lastUpdate.distance(to: Date()) >= 10 * 60 {
-                    currentTime -= 30
-                }
-                
-                startTime = max(currentTime, 0)
-            }
-            
-            logger.info("Computed fallback start time: \(startTime) (local entity: \(entity.currentTime) | \(entity.progress) | \(entity.lastUpdate) | \(entity.isFinished)")
-            
+            startTime = localStartTime
             sessionID = nil
-        }
-        
-        do {
-            if downloadStatus == .completed {
+
+            logger.info("Computed start time from local state: \(startTime) (local entity: \(entity.currentTime) | \(entity.progress) | \(entity.lastUpdate) | \(entity.isFinished))")
+
+            do {
                 audioTracks = try await PersistenceManager.shared.download.audioTracks(for: currentItemID)
                 chapters = await PersistenceManager.shared.download.chapters(itemID: currentItemID)
+            } catch {
+                activeOperationCount -= 1
+                logger.error("Failed to load audio tracks: \(error)")
+                UIApplication.shared.endBackgroundTask(task)
+                throw error
             }
-            
+
+            let capturedItemID = currentItemID
+            Task { [weak self] in
+                guard let self, await OfflineMode.shared.isAvailable(capturedItemID.connectionID) else { return }
+                do {
+                    let (_, _, _, remoteSessionID) = try await ABSClient[capturedItemID.connectionID].startPlaybackSession(itemID: capturedItemID)
+                    guard self.currentItemID == capturedItemID else { return }
+                    Defaults[.openPlaybackSessions].append(OpenPlaybackSessionPayload(sessionID: remoteSessionID, itemID: capturedItemID))
+                    await self.playbackReporter.attachSession(id: remoteSessionID)
+                } catch {
+                    self.logger.warning("Background session start failed: \(error)")
+                }
+            }
+        } else {
+            // Streaming path: track URLs come from the server, so we must wait for the session.
+            do {
+                if !OfflineMode.shared.isAvailable(currentItemID.connectionID) {
+                    throw AudioPlayerError.offline
+                }
+
+                let suggestedStartTime: TimeInterval
+                (audioTracks, chapters, suggestedStartTime, sessionID) = try await ABSClient[currentItemID.connectionID].startPlaybackSession(itemID: currentItemID)
+
+                let entityCurrentTime = entity.isFinished ? 0 : entity.currentTime
+                let delta = abs(entityCurrentTime - suggestedStartTime)
+
+                if delta > 60 {
+                    logger.warning("Server suggested a playback start time of \(suggestedStartTime), but our local state indicates \(entityCurrentTime). This may cause playback to skip or rewind. Using whichever is greater.")
+                    startTime = max(entityCurrentTime, suggestedStartTime)
+                } else {
+                    startTime = suggestedStartTime
+                }
+
+                logger.info("Computed start time: \(startTime) (server suggested: \(suggestedStartTime), local entity: \(entityCurrentTime) | \(entity.progress) | \(entity.lastUpdate)")
+
+                Defaults[.openPlaybackSessions].append(OpenPlaybackSessionPayload(sessionID: sessionID!, itemID: currentItemID))
+            } catch {
+                // Fall back to resolving and reporting locally
+                if entity.isFinished {
+                    startTime = 0
+                } else {
+                    var currentTime = entity.currentTime
+
+                    // 10 minutes
+                    if Defaults[.enableSmartRewind] && entity.lastUpdate.distance(to: Date()) >= 10 * 60 {
+                        currentTime -= 30
+                    }
+
+                    startTime = max(currentTime, 0)
+                }
+
+                logger.info("Computed fallback start time: \(startTime) (local entity: \(entity.currentTime) | \(entity.progress) | \(entity.lastUpdate) | \(entity.isFinished)")
+
+                sessionID = nil
+            }
+
             guard !audioTracks.isEmpty else {
+                activeOperationCount -= 1
+                logger.error("No audio tracks returned from server and item is not downloaded")
+                UIApplication.shared.endBackgroundTask(task)
                 throw AudioPlayerError.loadFailed
             }
-        } catch {
-            activeOperationCount -= 1
-            logger.error("Failed to load audio tracks: \(error)")
-            
-            UIApplication.shared.endBackgroundTask(task)
-            
-            throw error
         }
         
         if currentItemID.type == .episode, let episode = try? await currentItemID.resolved as? Episode, let extracted = episode.chapters {

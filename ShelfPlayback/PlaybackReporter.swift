@@ -19,7 +19,7 @@ final actor PlaybackReporter {
     
     private let itemID: ItemIdentifier
     
-    private let sessionID: String?
+    private var sessionID: String?
     private var localSessionID: UUID?
     
     private var startTime: TimeInterval
@@ -57,6 +57,12 @@ final actor PlaybackReporter {
         }
     }
     
+    func attachSession(id: String) {
+        guard sessionID == nil else { return }
+        sessionID = id
+        update()
+    }
+
     func update(duration: TimeInterval) {
         self.duration = duration
     }
