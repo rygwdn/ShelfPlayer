@@ -1,0 +1,24 @@
+//
+//  Release.xcconfig
+//  ShelfPlayer
+//
+//  Copy this file to Release.xcconfig and fill in your values.
+//  In CI this file is generated automatically from repository secrets
+//  (see .github/workflows/ios-build.yml). If a secret is absent the
+//  upstream defaults below are used, so forks only need to set the
+//  secrets they want to override.
+//
+//  APPLE_TEAM_ID          – Apple Developer team ID
+//  APPLE_BUNDLE_ID_PREFIX – reverse-DNS prefix (e.g. com.yourname)
+//  KEYCHAIN_GROUP_SUFFIX  – suffix for the shared app-group/keychain
+//                           (e.g. ShelfPlayer)
+
+#include "Base.xcconfig"
+
+DEVELOPMENT_TEAM = N8AA4S3S96
+BUNDLE_ID_PREFIX = io.rfk
+BUNDLE_ID_SUFFIX = shelfplayer
+
+KEYCHAIN_GROUP_SUFFIX = ShelfPlayer
+
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = ENABLE_CENTRALIZED
