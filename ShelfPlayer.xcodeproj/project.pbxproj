@@ -86,6 +86,7 @@
 		3A738A1A2EACCE8C00C8A210 /* LibraryEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A738A192EACCE8400C8A210 /* LibraryEnumerator.swift */; };
 		3A738A1C2EACD66300C8A210 /* CustomTabValueSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A738A1B2EACD65B00C8A210 /* CustomTabValueSheet.swift */; };
 		3A743CFA2D70CC8D0007C6B3 /* PlaybackRateEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A743CF92D70CC8D0007C6B3 /* PlaybackRateEditor.swift */; };
+		5ECFA1B11DC0496691376E82 /* GainEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3096EC00198441CA8FA15B3D /* GainEditor.swift */; };
 		3A77B6F82ACDDC9D00F22C7F /* AudiobookView+Header.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A77B6F72ACDDC9D00F22C7F /* AudiobookView+Header.swift */; };
 		3A77B7042ACDF76E00F22C7F /* AudiobookView+Toolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A77B7032ACDF76E00F22C7F /* AudiobookView+Toolbar.swift */; };
 		3A77B7092ACDF8F200F22C7F /* HeroBackButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A77B7082ACDF8F200F22C7F /* HeroBackButton.swift */; };
@@ -403,6 +404,7 @@
 		3A738A192EACCE8400C8A210 /* LibraryEnumerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEnumerator.swift; sourceTree = "<group>"; };
 		3A738A1B2EACD65B00C8A210 /* CustomTabValueSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomTabValueSheet.swift; sourceTree = "<group>"; };
 		3A743CF92D70CC8D0007C6B3 /* PlaybackRateEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRateEditor.swift; sourceTree = "<group>"; };
+		3096EC00198441CA8FA15B3D /* GainEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GainEditor.swift; sourceTree = "<group>"; };
 		3A77B6F72ACDDC9D00F22C7F /* AudiobookView+Header.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudiobookView+Header.swift"; sourceTree = "<group>"; };
 		3A77B7032ACDF76E00F22C7F /* AudiobookView+Toolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudiobookView+Toolbar.swift"; sourceTree = "<group>"; };
 		3A77B7082ACDF8F200F22C7F /* HeroBackButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroBackButton.swift; sourceTree = "<group>"; };
@@ -870,6 +872,7 @@
 				3AFB713C2D72F2F7002C3EF5 /* PreferencesView.swift */,
 				3AC3FD642D79E8C200FA10DF /* SleepTimerEditor.swift */,
 				3A743CF92D70CC8D0007C6B3 /* PlaybackRateEditor.swift */,
+				3096EC00198441CA8FA15B3D /* GainEditor.swift */,
 				3ACB8DEB2DE2FD7C005336C0 /* DebugPreferences.swift */,
 				3A90A6422D9BD01E009BDA84 /* CarPlayPreferences.swift */,
 				3AFFE79B2E7A803B003E6B94 /* TabValuePreferences.swift */,
@@ -1448,6 +1451,7 @@
 				3A9BF3382D42597C00573161 /* ItemLoadView.swift in Sources */,
 				3AB695362ACF3BAF00823049 /* ItemIDLoadView.swift in Sources */,
 				3AC3FD652D79E8C200FA10DF /* SleepTimerEditor.swift in Sources */,
+				5ECFA1B11DC0496691376E82 /* GainEditor.swift in Sources */,
 				3AFFE79C2E7A8060003E6B94 /* TabValuePreferences.swift in Sources */,
 				3AAFA5AC2D6D00B2002457C3 /* ProgressTracker.swift in Sources */,
 				3A3129A12D24140F00D143B4 /* WelcomeView.swift in Sources */,
