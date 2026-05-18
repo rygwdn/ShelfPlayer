@@ -85,8 +85,8 @@ final class TapState {
     // Called from the (non-RT) prepare callback.
     func prepare(channelCount: Int, sampleRate: Float) {
         channelStates?.deallocate()
-        let buf = UnsafeMutableBufferPointer<(Float, Float)>.allocate(capacity: channelCount)
-        buf.initialize(repeating: (0, 0))
+        let buf = UnsafeMutableBufferPointer<(w1: Float, w2: Float)>.allocate(capacity: channelCount)
+        buf.initialize(repeating: (w1: 0, w2: 0))
         channelStates = buf
         self.channelCount = channelCount
         context.sampleRate = sampleRate
@@ -106,6 +106,7 @@ final class TapState {
 // Creates an AVMutableAudioMix that applies overall gain and a peaking vocal-boost EQ to every
 // audio sample. The AudioProcessingContext is shared; updating its properties takes effect within
 // the next audio callback cycle (~23 ms) without recreating any taps.
+@MainActor
 func makeAudioMix(for item: AVPlayerItem, context: AudioProcessingContext) async -> AVMutableAudioMix? {
     guard let tracks = try? await item.asset.loadTracks(withMediaType: .audio), !tracks.isEmpty else {
         return nil
@@ -116,10 +117,10 @@ func makeAudioMix(for item: AVPlayerItem, context: AudioProcessingContext) async
     var callbacks = MTAudioProcessingTapCallbacks(
         version: kMTAudioProcessingTapCallbacksVersion_0,
         clientInfo: clientInfo,
-        `init`: { _, clientInfo, tapStorageOut in
+        init: { _, clientInfo, tapStorageOut in
             let ctx = Unmanaged<AudioProcessingContext>.fromOpaque(clientInfo!).takeUnretainedValue()
             let state = TapState(context: ctx)
-            tapStorageOut?.pointee = Unmanaged.passRetained(state).toOpaque()
+            tapStorageOut.pointee = Unmanaged.passRetained(state).toOpaque()
         },
         finalize: { tap in
             Unmanaged<TapState>.fromOpaque(MTAudioProcessingTapGetStorage(tap)).release()
@@ -172,14 +173,14 @@ func makeAudioMix(for item: AVPlayerItem, context: AudioProcessingContext) async
         }
     )
 
-    var tap: Unmanaged<MTAudioProcessingTap>?
+    var tap: UnsafeMutablePointer<MTAudioProcessingTap>?
     let status = MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
     guard status == noErr, let tap else { return nil }
 
     let mix = AVMutableAudioMix()
     mix.inputParameters = tracks.map { track in
         let params = AVMutableAudioMixInputParameters(track: track)
-        params.audioTapProcessor = tap.takeRetainedValue()
+        params.audioTapProcessor = tap
         return params
     }
     return mix
