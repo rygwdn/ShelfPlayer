@@ -173,7 +173,7 @@ func makeAudioMix(for item: AVPlayerItem, context: AudioProcessingContext) async
         }
     )
 
-    var tap: UnsafeMutablePointer<MTAudioProcessingTap>?
+    var tap: MTAudioProcessingTap?
     let status = MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
     guard status == noErr, let tap else { return nil }
 
