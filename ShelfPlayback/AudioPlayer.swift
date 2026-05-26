@@ -1,38 +1,68 @@
 //
 //  AudioPlayer.swift
-//  ShelfPlayerKit
+//  ShelfPlayback
 //
 //  Created by Rasmus Krämer on 20.02.25.
 //
 
+import Combine
 import Foundation
 import AVKit
 import MediaPlayer
 import OSLog
-import RFNotifications
 import ShelfPlayerKit
 
 public final actor AudioPlayer: Sendable {
+    public final class EventSource: @unchecked Sendable {
+        public let playbackItemChanged = PassthroughSubject<(ItemIdentifier, [Chapter], TimeInterval), Never>()
+        public let playStateChanged = PassthroughSubject<Bool, Never>()
+        public let skipped = PassthroughSubject<Bool, Never>()
+        public let bufferHealthChanged = PassthroughSubject<Bool, Never>()
+        public let durationsChanged = PassthroughSubject<(itemDuration: TimeInterval?, chapterDuration: TimeInterval?), Never>()
+        public let currentTimesChanged = PassthroughSubject<(itemDuration: TimeInterval?, chapterDuration: TimeInterval?), Never>()
+        public let chapterChanged = PassthroughSubject<Chapter?, Never>()
+        public let volumeChanged = PassthroughSubject<Percentage, Never>()
+        public let playbackRateChanged = PassthroughSubject<Percentage, Never>()
+        public let gainChanged = PassthroughSubject<Percentage, Never>()
+        public let vocalBoostChanged = PassthroughSubject<Percentage, Never>()
+        public let routeChanged = PassthroughSubject<AudioRoute, Never>()
+        public let sleepTimerChanged = PassthroughSubject<SleepTimerConfiguration?, Never>()
+        public let sleepTimerExpired = PassthroughSubject<SleepTimerConfiguration, Never>()
+        public let queueChanged = PassthroughSubject<[ItemIdentifier], Never>()
+        public let upNextQueueChanged = PassthroughSubject<[ItemIdentifier], Never>()
+        public let upNextStrategyChanged = PassthroughSubject<ResolvedUpNextStrategy?, Never>()
+        public let playbackStopped = PassthroughSubject<Void, Never>()
+
+        init() {}
+    }
+
     let logger = Logger(subsystem: "io.rfk.shelfPlayerKit", category: "AudioPlayer")
-    
+    public nonisolated let events = EventSource()
+
     var current: (any AudioEndpoint)?
-    
+
     private var startTask: Task<Void, Error>? = nil
-    
+
     let audioSession = AVAudioSession.sharedInstance()
     let widgetManager = NowPlayingWidgetManager()
-    
+
     var didPauseAt: Date?
     var sleepTimerDidExpireAt: (SleepTimerConfiguration, Date)?
-    
+
+    private var remoteSeekDirection: Bool?
+    private var remoteSeekBeganAt: Date?
+    private var remoteSeekAutoEndTask: Task<Void, Never>?
+
+    nonisolated(unsafe) var observerSubscriptions = Set<AnyCancellable>()
+
     init() {
         setupObservers()
-        
+
         Task {
             await addRemoteCommandTargets()
         }
     }
-    
+
     public static let shared = AudioPlayer()
 }
 
@@ -52,7 +82,7 @@ public extension AudioPlayer {
             await current?.upNextQueue ?? []
         }
     }
-    
+
     var chapters: [Chapter] {
         get async {
             await current?.chapters ?? []
@@ -63,7 +93,7 @@ public extension AudioPlayer {
             await current?.activeChapterIndex
         }
     }
-    
+
     var isBusy: Bool {
         get async {
             await current?.isBusy ?? true
@@ -74,7 +104,7 @@ public extension AudioPlayer {
             await current?.isPlaying ?? false
         }
     }
-    
+
     var volume: Percentage {
         get async {
             await current?.volume ?? 0
@@ -87,15 +117,15 @@ public extension AudioPlayer {
     }
     var gain: Percentage {
         get async {
-            await current?.gain ?? Defaults[.audioGain]
+            await current?.gain ?? AppSettings.shared.audioGain
         }
     }
     var vocalBoost: Percentage {
         get async {
-            await current?.vocalBoost ?? Defaults[.audioVocalBoost]
+            await current?.vocalBoost ?? AppSettings.shared.audioVocalBoost
         }
     }
-    
+
     var duration: TimeInterval? {
         get async {
             await current?.duration
@@ -106,7 +136,7 @@ public extension AudioPlayer {
             await current?.currentTime
         }
     }
-    
+
     var chapterDuration: TimeInterval? {
         get async {
             await current?.chapterDuration
@@ -117,7 +147,7 @@ public extension AudioPlayer {
             await current?.chapterCurrentTime
         }
     }
-    
+
     var route: AudioRoute? {
         get async {
             await current?.route
@@ -128,7 +158,7 @@ public extension AudioPlayer {
             await current?.sleepTimer
         }
     }
-    
+
     var upNextStrategy: ResolvedUpNextStrategy? {
         get async {
             await current?.upNextStrategy
@@ -139,15 +169,16 @@ public extension AudioPlayer {
             await current?.pendingTimeSpendListening
         }
     }
-    
+
     func start(_ item: AudioPlayerItem) async throws {
         guard startTask == nil else {
+            logger.warning("Start already in progress; ignoring request for item \(item.itemID, privacy: .public)")
             return
         }
-        
+
         startTask = .init {
             await self.stop()
-            
+
             do {
                 current = try await LocalAudioEndpoint(item)
             } catch {
@@ -155,33 +186,33 @@ public extension AudioPlayer {
                 await self.stop()
                 throw error
             }
-            
+
             startTask = nil
         }
-        
+
         return try await startTask!.value
     }
     @discardableResult
     func startGrouping(_ itemID: ItemIdentifier) async throws -> ItemIdentifier {
         let targetID = try await ResolveCache.nextGroupingItem(itemID).id
         try await start(.init(itemID: targetID, origin: .series(itemID)))
-        
+
         return targetID
     }
-    
+
     func queue(_ items: [AudioPlayerItem]) async throws {
         if let current {
             try await current.queue(items)
             return
         }
-        
+
         guard !items.isEmpty else {
             return
         }
-        
+
         var items = items
         let item = items.removeFirst()
-        
+
         try await start(item)
         try await current!.queue(items)
     }
@@ -189,10 +220,10 @@ public extension AudioPlayer {
     func queueGrouping(_ itemID: ItemIdentifier) async throws -> ItemIdentifier {
         let targetID = try await ResolveCache.nextGroupingItem(itemID).id
         try await queue([.init(itemID: targetID, origin: .series(itemID))])
-        
+
         return targetID
     }
-    
+
     func stop() async {
         await current?.stop()
         current = nil
@@ -201,29 +232,29 @@ public extension AudioPlayer {
         guard current?.id == endpointID else {
             return
         }
-        
+
         await stop()
     }
-    
+
     func play() async {
         await current?.play()
-        
+
         if let didPauseAt {
             if didPauseAt.distance(to: .now) > 30 {
                 do {
                     try await applySmartRewind()
                 } catch {
-                    logger.error("Could not seek back 10 seconds (smart rewind): \(error)")
+                    logger.error("Smart rewind failed (delta >= 30s): \(error, privacy: .public)")
                 }
             }
-            
+
             self.didPauseAt = nil
         }
-        
+
         if let (configuration, date) = sleepTimerDidExpireAt {
             let distance = date.distance(to: .now)
-            
-            if Defaults[.extendSleepTimerOnPlay], distance <= 10 {
+
+            if AppSettings.shared.extendSleepTimerOnPlay, distance <= 10 {
                 await extendSleepTimer(configuration)
             }
         }
@@ -232,7 +263,7 @@ public extension AudioPlayer {
         didPauseAt = .now
         await current?.pause()
     }
-    
+
     func seek(to time: TimeInterval, insideChapter: Bool) async throws {
         if let current {
             try await current.seek(to: time, insideChapter: insideChapter)
@@ -242,24 +273,24 @@ public extension AudioPlayer {
         guard let currentTime = await currentTime else {
             throw AudioPlayerError.invalidTime
         }
-        
+
         let amount: TimeInterval
-        
+
         if forwards {
-            amount = .init(Defaults[.skipForwardsInterval])
+            amount = .init(AppSettings.shared.skipForwardsInterval)
         } else {
-            amount = -.init(Defaults[.skipBackwardsInterval])
+            amount = -.init(AppSettings.shared.skipBackwardsInterval)
         }
-        
+
         try await seek(to: currentTime + amount, insideChapter: false)
-        
-        await RFNotification[.skipped].send(payload: forwards)
+
+        events.skipped.send(forwards)
     }
-    
+
     func move(queueIndex: IndexSet, to: Int) async {
         await current?.move(queueIndex: queueIndex, to: to)
     }
-    
+
     func setVolume(_ volume: Percentage) async {
         await current?.setVolume(volume)
     }
@@ -271,7 +302,7 @@ public extension AudioPlayer {
     }
     func setPlaybackRate(_ rate: Percentage) async {
         await current?.setPlaybackRate(rate)
-        
+
         if let itemID = await currentItemID {
             Task {
                 do {
@@ -282,60 +313,111 @@ public extension AudioPlayer {
             }
         }
     }
-    
-    func beginSeeking(_ forwards: Bool) async {
-        await current?.beginSeeking(forwards)
+
+    func handleRemoteSeek(forwards: Bool, type: MPSeekCommandEventType?) async {
+        guard current != nil else {
+            return
+        }
+
+        if type == .endSeeking {
+            let beganAt = remoteSeekBeganAt
+            await stopRemoteSeek()
+
+            // Some senders (e.g. CarPlay rocker buttons) translate a short tap into
+            // begin+end fast-forward within milliseconds. Treat that as a skip command.
+            if let beganAt, Date().timeIntervalSince(beganAt) < 0.35 {
+                do {
+                    try await skip(forwards: forwards)
+                } catch {
+                    logger.error("MP-Command: skip-on-tap failed: \(error)")
+                }
+            }
+            return
+        }
+
+        if let direction = remoteSeekDirection, direction != forwards {
+            await current?.endSeeking()
+            remoteSeekDirection = nil
+            remoteSeekBeganAt = nil
+        }
+
+        if remoteSeekDirection == nil {
+            remoteSeekDirection = forwards
+            remoteSeekBeganAt = Date()
+            await current?.beginSeeking(forwards)
+        }
+
+        remoteSeekAutoEndTask?.cancel()
+        let timeout = max(0.05, AppSettings.shared.remoteSeekAutoEndInterval)
+        remoteSeekAutoEndTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(timeout))
+            guard !Task.isCancelled else {
+                return
+            }
+            await self?.stopRemoteSeek()
+        }
     }
-    func endSeeking() async {
+
+    private func stopRemoteSeek() async {
+        remoteSeekAutoEndTask?.cancel()
+        remoteSeekAutoEndTask = nil
+
+        guard remoteSeekDirection != nil else {
+            return
+        }
+
+        remoteSeekDirection = nil
+        remoteSeekBeganAt = nil
         await current?.endSeeking()
     }
-    
+
     func setSleepTimer(_ configuration: SleepTimerConfiguration?) async {
         await current?.setSleepTimer(configuration)
     }
-    
+
     func skip(queueIndex index: Int) async {
         await current?.skip(queueIndex: index)
     }
     func skip(upNextQueueIndex index: Int) async {
         await current?.skip(upNextQueueIndex: index)
     }
-    
+
     func remove(queueIndex index: Int) async {
         await current?.remove(queueIndex: index)
     }
     func remove(upNextQueueIndex index: Int) async {
         await current?.remove(upNextQueueIndex: index)
     }
-    
+
     func clearQueue() async {
         await current?.clearQueue()
     }
     func clearUpNextQueue() async {
         await current?.clearUpNextQueue()
     }
-    
+
     func extendSleepTimer(_ configuration: SleepTimerConfiguration? = nil) async {
+        let settings = AppSettings.shared
         if let configuration {
-            await setSleepTimer(configuration.extended)
+            await setSleepTimer(configuration.extended(byPreviousSetting: settings.extendSleepTimerByPreviousSetting, extendInterval: settings.sleepTimerExtendInterval, extendChapterAmount: settings.sleepTimerExtendChapterAmount))
         } else if let sleepTimer = await sleepTimer {
-            await setSleepTimer(sleepTimer.extended)
+            await setSleepTimer(sleepTimer.extended(byPreviousSetting: settings.extendSleepTimerByPreviousSetting, extendInterval: settings.sleepTimerExtendInterval, extendChapterAmount: settings.sleepTimerExtendChapterAmount))
         } else {
             logger.warning("Can't extend sleep timer: no configuration")
         }
     }
-    
+
     func applySmartRewind() async throws {
-        guard Defaults[.enableSmartRewind] else {
+        guard AppSettings.shared.enableSmartRewind else {
             return
         }
-        
+
         guard let currentTime = await currentTime else {
             return
         }
-        
+
         let target = currentTime - 10
-        
+
         if let activeChapterIndex = await activeChapterIndex {
             let startOffset = await chapters[activeChapterIndex].startOffset
             try await seek(to: max(startOffset, target), insideChapter: false)
@@ -343,21 +425,21 @@ public extension AudioPlayer {
             try await seek(to: target, insideChapter: false)
         }
     }
-    
+
     func createQuickBookmark() async throws {
         guard let currentItemID = await currentItemID, let currentTime = await currentTime else {
             throw AudioPlayerError.invalidTime
         }
-        
+
         let note = Date.now.formatted(date: .abbreviated, time: .shortened)
-        
+
         try await PersistenceManager.shared.bookmark.create(at: UInt64(currentTime), note: note, for: currentItemID)
     }
-    
+
     func cyclePlaybackSpeed() async {
-        let playbackRates = Defaults[.playbackRates]
+        let playbackRates = AppSettings.shared.playbackRates
         let playbackRate = await playbackRate
-        
+
         guard let index = playbackRates.firstIndex(where: {
             $0 + 0.001 > playbackRate
             && $0 - 0.001 < playbackRate
@@ -365,10 +447,10 @@ public extension AudioPlayer {
             if let rate = playbackRates.first {
                 await setPlaybackRate(rate)
             }
-            
+
             return
         }
-        
+
         if index + 1 < playbackRates.count {
             await setPlaybackRate(playbackRates[index + 1])
         } else if let rate = playbackRates.first {
@@ -388,56 +470,51 @@ private extension AudioPlayer {
     func sleepTimerDidExpire(configuration: SleepTimerConfiguration) {
         sleepTimerDidExpireAt = (configuration, .now)
     }
-    
+
     nonisolated func setupObservers() {
-        Task {
-            for await interval in Defaults.updates(.skipBackwardsInterval, initial: false) {
-                MPRemoteCommandCenter.shared().skipBackwardCommand.preferredIntervals = [NSNumber(value: interval)]
-            }
-        }
-        Task {
-            for await interval in Defaults.updates(.skipForwardsInterval, initial: false) {
-                MPRemoteCommandCenter.shared().skipForwardCommand.preferredIntervals = [NSNumber(value: interval)]
-            }
-        }
-        
-        RFNotification[.shake].subscribe(queue: .sender) { [weak self] duration in
-            guard Defaults[.shakeExtendsSleepTimer] && duration > 0.5 else {
-                return
-            }
-            
-            Task {
-                await self?.extendSleepTimer()
-            }
-        }
-        RFNotification[.sleepTimerExpired].subscribe(queue: .sender) { [weak self] configuration in
-            Task {
-                await self?.sleepTimerDidExpire(configuration: configuration)
-                
-                do {
-                    try await self?.applySmartRewind()
-                } catch {
-                    self?.logger.warning("Could not rewind after sleep timer expired: \(error)")
+        let settings = AppSettings.shared
+
+        MPRemoteCommandCenter.shared().skipBackwardCommand.preferredIntervals = [NSNumber(value: settings.skipBackwardsInterval)]
+        MPRemoteCommandCenter.shared().skipForwardCommand.preferredIntervals = [NSNumber(value: settings.skipForwardsInterval)]
+
+        AppEventSource.shared.shake
+            .sink { [weak self] duration in
+                guard settings.shakeExtendsSleepTimer && duration > 0.5 else {
+                    return
+                }
+
+                Task {
+                    await self?.extendSleepTimer()
                 }
             }
-        }
-        
-        Task { [weak self] in
-            for await _ in Defaults.updates(.playbackRates, initial: false) {
-                self?.updateCommandCenterPlaybackRates()
+            .store(in: &observerSubscriptions)
+        events.sleepTimerExpired
+            .sink { [weak self] configuration in
+                Task {
+                    await self?.sleepTimerDidExpire(configuration: configuration)
+
+                    do {
+                        try await self?.applySmartRewind()
+                    } catch {
+                        self?.logger.warning("Could not rewind after sleep timer expired: \(error)")
+                    }
+                }
             }
-        }
+            .store(in: &observerSubscriptions)
+
+        updateCommandCenterPlaybackRates()
     }
     @MainActor
     func addRemoteCommandTargets() {
         let commandCenter = MPRemoteCommandCenter.shared()
-        
+        let settings = AppSettings.shared
+
         commandCenter.playCommand.isEnabled = true
         commandCenter.playCommand.addTarget { _ in
             Task {
                 await self.play()
             }
-            
+
             return .success
         }
         commandCenter.pauseCommand.isEnabled = true
@@ -445,7 +522,7 @@ private extension AudioPlayer {
             Task {
                 await self.pause()
             }
-            
+
             return .success
         }
         commandCenter.togglePlayPauseCommand.isEnabled = true
@@ -457,28 +534,28 @@ private extension AudioPlayer {
                     await self.play()
                 }
             }
-            
+
             return .success
         }
-        
+
         commandCenter.changePlaybackPositionCommand.isEnabled = true
         commandCenter.changePlaybackPositionCommand.addTarget { [unowned self] event in
             self.logger.info("MP-Command: changePlaybackPosition triggered")
-            
-            if Defaults[.lockSeekBar] {
+
+            if settings.lockSeekBar {
                 self.logger.error("MP-Command: changePlaybackPosition failed: seek bar is locked")
-                
+
                 return .commandFailed
             }
-            
+
             guard let changePlaybackPositionCommandEvent = event as? MPChangePlaybackPositionCommandEvent else {
                 self.logger.error("MP-Command: changePlaybackPosition failed: invalid event type")
-                
+
                 return .commandFailed
             }
-            
+
             let positionTime = changePlaybackPositionCommandEvent.positionTime
-            
+
             Task {
                 do {
                     try await seek(to: positionTime, insideChapter: true)
@@ -486,10 +563,10 @@ private extension AudioPlayer {
                     self.logger.error("MP-Command: changePlaybackPosition failed: \(error)")
                 }
             }
-            
+
             return .success
         }
-        
+
         commandCenter.previousTrackCommand.isEnabled = false
         commandCenter.previousTrackCommand.addTarget { _ in
             Task {
@@ -499,10 +576,10 @@ private extension AudioPlayer {
                     self.logger.error("MP-Command: previousTrack failed: \(error)")
                 }
             }
-            
+
             return .success
         }
-        
+
         commandCenter.nextTrackCommand.isEnabled = false
         commandCenter.nextTrackCommand.addTarget { _ in
             Task {
@@ -512,94 +589,64 @@ private extension AudioPlayer {
                     self.logger.error("MP-Command: nextTrack failed: \(error)")
                 }
             }
-            
+
             return .success
         }
-        
+
         commandCenter.seekBackwardCommand.isEnabled = true
         commandCenter.seekBackwardCommand.addTarget { event in
-            self.logger.info("MP-Command: seekBackward triggered")
-            
-            guard let event = event as? MPSeekCommandEvent else {
-                self.logger.error("MP-Command: seekBackward failed: invalid event type")
-                
-                return .commandFailed
-            }
-            
-            let type = event.type
-            
+            let type = (event as? MPSeekCommandEvent)?.type
+            self.logger.info("MP-Command: seekBackward triggered (type=\(String(describing: type?.rawValue)))")
+
             Task {
-                guard await self.current != nil else {
-                    self.logger.error("MP-Command: seekBackward failed: no active endpoint")
-                    return
-                }
-                
-                switch type {
-                    case .beginSeeking: await self.beginSeeking(false)
-                    default: await self.endSeeking()
-                }
+                await self.handleRemoteSeek(forwards: false, type: type)
             }
 
             return .success
         }
         commandCenter.seekForwardCommand.isEnabled = true
         commandCenter.seekForwardCommand.addTarget { event in
-            self.logger.info("MP-Command: seekForward triggered")
-            
-            guard let event = event as? MPSeekCommandEvent else {
-                self.logger.error("MP-Command: seekForward failed: invalid event type")
-                
-                return .commandFailed
-            }
-            
-            let type = event.type
-            
+            let type = (event as? MPSeekCommandEvent)?.type
+            self.logger.info("MP-Command: seekForward triggered (type=\(String(describing: type?.rawValue)))")
+
             Task {
-                guard await self.current != nil else {
-                    self.logger.error("MP-Command: seekForward failed: no active endpoint")
-                    return
-                }
-                
-                switch type {
-                    case .beginSeeking: await self.beginSeeking(true)
-                    default: await self.endSeeking()
-                }
+                await self.handleRemoteSeek(forwards: true, type: type)
             }
 
             return .success
         }
-        
+
         commandCenter.skipBackwardCommand.isEnabled = true
-        commandCenter.skipBackwardCommand.preferredIntervals = [NSNumber(value: Defaults[.skipBackwardsInterval])]
+        commandCenter.skipBackwardCommand.preferredIntervals = [NSNumber(value: settings.skipBackwardsInterval)]
         commandCenter.skipBackwardCommand.addTarget { _ in
             Task {
                 self.logger.info("MP-Command: skipBackward triggered")
-                
+
                 do {
                     try await self.skip(forwards: false)
                 } catch {
                     self.logger.error("MP-Command: skipBackward failed: \(error)")
                 }
             }
-            
+
             return .success
         }
         commandCenter.skipForwardCommand.isEnabled = true
-        commandCenter.skipForwardCommand.preferredIntervals = [NSNumber(value: Defaults[.skipForwardsInterval])]
+        commandCenter.skipForwardCommand.preferredIntervals = [NSNumber(value: settings.skipForwardsInterval)]
         commandCenter.skipForwardCommand.addTarget { _ in
             Task {
                 self.logger.info("MP-Command: skipForward triggered")
-                
+
                 do {
                     try await self.skip(forwards: true)
                 } catch {
                     self.logger.error("MP-Command: skipForward failed: \(error)")
                 }
             }
-            
+
             return .success
         }
-        
+
         commandCenter.bookmarkCommand.isEnabled = true
         commandCenter.bookmarkCommand.addTarget { _ in
             Task {
@@ -609,37 +656,37 @@ private extension AudioPlayer {
                     self.logger.error("Failed to create quick bookmark: \(error)")
                 }
             }
-            
+
             return .success
         }
-        
+
         updateCommandCenterPlaybackRates()
         commandCenter.changePlaybackRateCommand.isEnabled = true
         commandCenter.changePlaybackRateCommand.addTarget {
             guard let event = $0 as? MPChangePlaybackRateCommandEvent else {
                 return .commandFailed
             }
-            
+
             let value = Percentage(event.playbackRate)
-            
+
             Task {
                 await self.setPlaybackRate(value)
             }
-            
+
             return .success
         }
-        
+
         commandCenter.stopCommand.isEnabled = true
         commandCenter.stopCommand.addTarget { _ in
             Task {
                 await self.stop()
             }
-            
+
             return .success
         }
     }
-    
+
     nonisolated func updateCommandCenterPlaybackRates() {
-        MPRemoteCommandCenter.shared().changePlaybackRateCommand.supportedPlaybackRates = Defaults[.playbackRates].map { NSNumber(value: $0) }
+        MPRemoteCommandCenter.shared().changePlaybackRateCommand.supportedPlaybackRates = AppSettings.shared.playbackRates.map { NSNumber(value: $0) }
     }
 }

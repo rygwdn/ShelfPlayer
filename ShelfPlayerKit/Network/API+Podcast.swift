@@ -1,65 +1,78 @@
 //
-//  AudiobookshelfClient+Podcasts.swift
-//  Audiobooks
-//
-//  Created by Rasmus Krämer on 07.10.23.
+//  API+Podcast.swift
+//  ShelfPlayerKit
 //
 
 import Foundation
 
 public extension APIClient {
-    func home(for libraryID: String) async throws -> ([HomeRow<Podcast>], [HomeRow<Episode>]) {
-        let response = try await response(APIRequest<[HomeRowPayload]>(path: "api/libraries/\(libraryID)/personalized", method: .get, ttl: 12))
-        
+    func home(for libraryID: String, bypassCache: Bool = false) async throws -> ([HomeRow<Podcast>], [HomeRow<Episode>]) {
+        let response = try await response(APIRequest<[HomeRowPayload]>(path: "api/libraries/\(libraryID)/personalized", method: .get, ttl: 12, bypassesCache: bypassCache))
+
         var episodes = [HomeRow<Episode>]()
         var podcasts = [HomeRow<Podcast>]()
-        
+
         for row in response {
             if row.entities.isEmpty {
                 continue
             }
-            
+
             if row.type == "episode" {
-                episodes.append(HomeRow(id: row.id, label: row.label, entities: row.entities.compactMap{ Episode(payload: $0, connectionID: connectionID) }))
+                episodes.append(HomeRow(id: row.id, label: row.label, entities: row.entities.compactMap { Episode(payload: $0, connectionID: connectionID) }))
             } else if row.type == "podcast" {
                 podcasts.append(HomeRow(id: row.id, label: row.label, entities: row.entities.map { Podcast(payload: $0, connectionID: connectionID) }))
             }
         }
-        
+
         return (podcasts, episodes)
     }
-    
+
     func podcast(with identifier: ItemIdentifier) async throws -> (Podcast, [Episode]) {
         try await podcast(with: identifier.primaryID)
-        
     }
+
     func podcast(with identifier: ItemIdentifier.PrimaryID) async throws -> (Podcast, [Episode]) {
         let item: ItemPayload = try await response(APIRequest<ItemPayload>(path: "api/items/\(identifier)", method: .get, ttl: 12))
         let podcast = Podcast(payload: item, connectionID: connectionID)
-        
+
         guard let episodes = item.media?.episodes else {
             throw APIClientError.notFound
         }
-            
+
         return (podcast, episodes.compactMap { Episode(episode: $0, item: item, connectionID: connectionID) })
-        
     }
-    
+
+    /// Random sample of podcasts from a library, used to power the client-
+    /// derived "Explore" home row. The server reshuffles on every call (the
+    /// `sort=random` branch is also exempt from the API cache server-side), so
+    /// successive loads surface different items.
+    func podcastsRandom(from libraryID: String, limit: Int) async throws -> [Podcast] {
+        let query: [URLQueryItem] = [
+            .init(name: "sort", value: "random"),
+            .init(name: "desc", value: "0"),
+            .init(name: "limit", value: String(limit)),
+            .init(name: "include", value: "numEpisodesIncomplete"),
+        ]
+
+        let response = try await response(APIRequest<ResultResponse>(path: "api/libraries/\(libraryID)/items", method: .get, query: query, bypassesCache: true))
+        return response.results.map { Podcast(payload: $0, connectionID: connectionID) }
+    }
+
     func podcasts(from libraryID: String, sortOrder: PodcastSortOrder, ascending: Bool, limit: Int?, page: Int?) async throws -> ([Podcast], Int) {
         var query: [URLQueryItem] = [
             .init(name: "sort", value: sortOrder.queryValue),
             .init(name: "desc", value: ascending ? "0" : "1"),
         ]
-        
+
         if let page {
             query.append(.init(name: "page", value: String(page)))
         }
         if let limit {
             query.append(.init(name: "limit", value: String(limit)))
         }
-        
+
         query.append(.init(name: "include", value: "numEpisodesIncomplete"))
-        
+
         let response = try await response(APIRequest<ResultResponse>(path: "api/libraries/\(libraryID)/items", method: .get, query: query, ttl: 12))
         return (response.results.map { Podcast(payload: $0, connectionID: connectionID) }, response.total)
     }

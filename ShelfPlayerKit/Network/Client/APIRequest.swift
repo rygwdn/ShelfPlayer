@@ -1,8 +1,6 @@
 //
 //  APIRequest.swift
-//  ShelfPlayer
-//
-//  Created by Rasmus Krämer on 23.12.25.
+//  ShelfPlayerKit
 //
 
 import Foundation
@@ -11,37 +9,48 @@ import CryptoKit
 public struct APIRequest<R: Decodable>: APIRequestProtocol, @unchecked Sendable {
     public let path: String
     public let method: HTTPMethod
-    
+
     public let body: Any?
     public let query: [URLQueryItem]
     public let headers: [String: String]
-    
+
     public let ttl: TimeInterval?
     public let timeout: TimeInterval
     public let maxAttempts: Int
     public let bypassesOffline: Bool
     public let bypassesScheduler: Bool
-    
+    /// When true the API client skips its cache lookup and forces a network
+    /// fetch. The new response is still written to the cache (subject to
+    /// `ttl`), so subsequent non-bypassing requests can use it.
+    public let bypassesCache: Bool
+    /// When true, exhausting `maxAttempts` triggers a connection-availability
+    /// probe whose result may flip the connection into offline mode. Set to
+    /// false for best-effort calls (frequent progress syncs, fire-and-forget
+    /// writes) whose individual failure is a poor signal of server health.
+    public let marksOfflineOnExhaustion: Bool
+
     public let dataBody: Data?
-    
+
     public let id: String
     public let description: String
-    
-    public init(path: String, method: HTTPMethod, body: Any? = nil, query: [URLQueryItem] = [], headers: [String: String] = [:], ttl: TimeInterval? = nil, timeout: TimeInterval = 45, maxAttempts: Int = 3, bypassesOffline: Bool = false, bypassesScheduler: Bool = false) {
+
+    public init(path: String, method: HTTPMethod, body: Any? = nil, query: [URLQueryItem] = [], headers: [String: String] = [:], ttl: TimeInterval? = nil, timeout: TimeInterval = 45, maxAttempts: Int = 3, bypassesOffline: Bool = false, bypassesScheduler: Bool = false, bypassesCache: Bool = false, marksOfflineOnExhaustion: Bool = true) {
         self.path = path
         self.method = method
-        
+
         self.body = body
         self.query = query
         self.headers = headers
-        
+
         self.ttl = ttl
         self.timeout = timeout
         self.maxAttempts = maxAttempts
-        
+
         self.bypassesOffline = bypassesOffline
         self.bypassesScheduler = bypassesScheduler
-        
+        self.bypassesCache = bypassesCache
+        self.marksOfflineOnExhaustion = marksOfflineOnExhaustion
+
         if let body {
             if let encodable = body as? Encodable {
                 dataBody = try? JSONEncoder().encode(encodable)
@@ -51,15 +60,15 @@ public struct APIRequest<R: Decodable>: APIRequestProtocol, @unchecked Sendable 
         } else {
             dataBody = nil
         }
-        
+
         let bodyDescription: String
-        
+
         if let dataBody, let description = String(data: dataBody, encoding: .utf8) {
             bodyDescription = description
         } else {
             bodyDescription = "-"
         }
-        
+
         description = """
         API-Request:
         \(URL(string: "s://0/")!.appending(path: path).appending(queryItems: query).absoluteString)
@@ -70,12 +79,13 @@ public struct APIRequest<R: Decodable>: APIRequestProtocol, @unchecked Sendable 
         Max Attempts: \(self.maxAttempts)
         Bypasses Offline: \(bypassesOffline)
         Bypasses Scheduler: \(bypassesScheduler)
+        Marks Offline On Exhaustion: \(marksOfflineOnExhaustion)
         """
-        
+
         let digest = SHA256.hash(data: Data(description.utf8))
         id = digest.map { String(format: "%02x", $0) }.joined()
     }
-    
+
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
         hasher.combine(path)
@@ -87,19 +97,26 @@ public struct APIRequest<R: Decodable>: APIRequestProtocol, @unchecked Sendable 
         hasher.combine(maxAttempts)
         hasher.combine(bypassesOffline)
         hasher.combine(bypassesScheduler)
+        hasher.combine(marksOfflineOnExhaustion)
     }
+
     public static func == (lhs: APIRequest<R>, rhs: APIRequest<R>) -> Bool {
         lhs.id == rhs.id
     }
-    
+
     public func _typecast(_ data: Data) throws -> R {
-        try JSONDecoder().decode(R.self, from: data)
+        do {
+            return try JSONDecoder().decode(R.self, from: data)
+        } catch is DecodingError {
+            throw APIClientError.parseError
+        }
     }
+
     public func typecast(decodable: any Decodable) throws -> R {
         guard let type = decodable as? R else {
             throw APIClientError.serializeError
         }
-        
+
         return type
     }
 }
@@ -108,6 +125,6 @@ public extension APIClient {
     struct DataResponse: Decodable, Sendable {
         public let data: Data
     }
-    struct EmptyResponse: Decodable, Sendable {
-    }
+
+    struct EmptyResponse: Decodable, Sendable {}
 }

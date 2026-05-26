@@ -1,12 +1,11 @@
 //
-//  SortOrder+ApiValue.swift
+//  SortOrder+URL.swift
 //  ShelfPlayerKit
 //
 //  Created by Rasmus Krämer on 14.11.24.
 //
 
 import Foundation
-
 
 extension AudiobookSortOrder {
     var queryValue: String {
@@ -66,8 +65,6 @@ extension PodcastSortOrder {
             "media.numTracks"
         case .addedAt:
             "addedAt"
-        case .duration:
-            "sort.duration"
         }
     }
 }

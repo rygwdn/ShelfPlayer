@@ -1,0 +1,125 @@
+//
+//  HomeSection.swift
+//  ShelfPlayerKit
+//
+//  Created by Rasmus Krämer on 19.04.26.
+//
+
+import Foundation
+
+public enum HomeSectionKind: Codable, Hashable, Sendable {
+    // Server-driven rows (from ABSClient.home(for:)).
+    // The associated `id` matches `HomeRow.id` returned by the server.
+    case serverRow(id: String)
+
+    // Client-derived sections.
+    case listenNowAudiobooks
+    case listenNowEpisodes
+    case upNext
+    /// Next unplayed episode per recently-played podcast in the current scope.
+    case nextUpPodcasts
+    case downloadedAudiobooks
+    case downloadedEpisodes
+    case bookmarks
+    /// Renders the items of a specific user collection as a home row. The
+    /// associated string is the collection's `ItemIdentifier.description`.
+    case collection(itemID: String)
+    /// Renders the items of a specific user playlist as a home row. The
+    /// associated string is the playlist's `ItemIdentifier.description`.
+    case playlist(itemID: String)
+
+    public var stableID: String {
+        switch self {
+        case .serverRow(let id): "server::\(id)"
+        case .listenNowAudiobooks: "client::listenNowAudiobooks"
+        case .listenNowEpisodes: "client::listenNowEpisodes"
+        case .upNext: "client::upNext"
+        case .nextUpPodcasts: "client::nextUpPodcasts"
+        case .downloadedAudiobooks: "client::downloadedAudiobooks"
+        case .downloadedEpisodes: "client::downloadedEpisodes"
+        case .bookmarks: "client::bookmarks"
+        case .collection(let itemID): "client::collection::\(itemID)"
+        case .playlist(let itemID): "client::playlist::\(itemID)"
+        }
+    }
+
+    public var isClientDerived: Bool {
+        if case .serverRow = self { false } else { true }
+    }
+
+    /// Server rows can only be fetched from a single library — the
+    /// multi-library home customization sheet uses this to hide the "Any
+    /// Library" option from the row's library picker.
+    public var requiresExplicitLibrary: Bool {
+        if case .serverRow = self { true } else { false }
+    }
+
+    /// Library media types that can produce content for this kind, or nil if
+    /// the kind works for any library. Used by the multi-library customization
+    /// sheet to filter incompatible libraries out of the row's picker (e.g.
+    /// a podcast library cannot back the `continue-series` row).
+    public var supportedLibraryTypes: Set<LibraryMediaType>? {
+        switch self {
+        case .serverRow(let id):
+            switch id {
+            case "continue-series", "recent-series", "discover", "newest-authors":
+                [.audiobooks]
+            case "newest-episodes":
+                [.podcasts]
+            default:
+                nil
+            }
+        case .listenNowAudiobooks, .downloadedAudiobooks, .bookmarks:
+            [.audiobooks]
+        case .listenNowEpisodes, .downloadedEpisodes, .nextUpPodcasts:
+            [.podcasts]
+        case .upNext, .collection, .playlist:
+            nil
+        }
+    }
+}
+
+public struct HomeSection: Codable, Identifiable, Hashable, Sendable {
+    public let id: UUID
+    public var kind: HomeSectionKind
+
+    /// When non-nil, the section is resolved against this library instead of
+    /// the enclosing scope's library. Used by the multi-library panel to
+    /// aggregate content across libraries.
+    public var libraryID: LibraryIdentifier?
+
+    public var isHidden: Bool
+
+    public init(id: UUID = UUID(),
+                kind: HomeSectionKind,
+                libraryID: LibraryIdentifier? = nil,
+                isHidden: Bool = false) {
+        self.id = id
+        self.kind = kind
+        self.libraryID = libraryID
+        self.isHidden = isHidden
+    }
+}
+
+public enum HomeScope: Hashable, Sendable {
+    /// The start page of a specific library.
+    case library(LibraryIdentifier)
+    /// The multi-library start page — aggregates rows across libraries.
+    case multiLibrary
+
+    public var key: String {
+        switch self {
+        case .library(let libraryID): "library::\(libraryID.id)"
+        case .multiLibrary: "multiLibrary"
+        }
+    }
+
+    /// The library used to resolve a section when the section itself does not
+    /// carry an override. The multi-library scope has none.
+    public var implicitLibraryID: LibraryIdentifier? {
+        switch self {
+        case .library(let libraryID): libraryID
+        case .multiLibrary: nil
+        }
+    }
+}

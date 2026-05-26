@@ -1,0 +1,27 @@
+//
+//  StartAudiobookIntent.swift
+//  ShelfPlayer
+//
+
+import Foundation
+import AppIntents
+import ShelfPlayerKit
+
+@AppIntent(schema: .books.playAudiobook)
+public struct StartAudiobookIntent: AudioPlaybackIntent {
+    @AppDependency private var audioPlayer: IntentAudioPlayer
+
+    public init() {}
+
+    public init(audiobook: Audiobook) async {
+        self.target = await .init(audiobook: audiobook)
+    }
+
+    @Parameter(optionsProvider: AudiobookEntityOptionsProvider())
+    public var target: AudiobookEntity
+
+    public func perform() async throws -> some IntentResult {
+        try await audioPlayer.start(target.id)
+        return .result()
+    }
+}

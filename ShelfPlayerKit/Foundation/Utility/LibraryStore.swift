@@ -1,24 +1,36 @@
+//
+//  LibraryStore.swift
+//  ShelfPlayerKit
+//
+//  Created by Rasmus Krämer on 01.06.25.
+//
+
+import Combine
 import Foundation
-import SwiftUI
 import OSLog
-import ShelfPlayback
+import SwiftUI
 
 @Observable @MainActor
 public final class LibraryStore {
-    let logger = Logger(subsystem: "io.rfk.ShelfPlayerKit", category: "LibraryStore")
+    nonisolated let logger = Logger(subsystem: "io.rfk.ShelfPlayerKit", category: "LibraryStore")
 
     private(set) public var libraries: [Library] = []
     private(set) public var groupedLibraries: [ItemIdentifier.ConnectionID: [Library]] = [:]
+    private var observerSubscriptions = Set<AnyCancellable>()
 
     private init() {
         update()
 
-        RFNotification[.offlineModeChanged].subscribe { [weak self] _ in
-            self?.update()
-        }
-        RFNotification[.connectionsChanged].subscribe { [weak self] in
-            self?.update()
-        }
+        OfflineMode.events.changed
+            .sink { [weak self] _ in
+                self?.update()
+            }
+            .store(in: &observerSubscriptions)
+        PersistenceManager.shared.authorization.events.connectionsChanged
+            .sink { [weak self] in
+                self?.update()
+            }
+            .store(in: &observerSubscriptions)
     }
 
     public nonisolated func update() {
@@ -30,18 +42,26 @@ public final class LibraryStore {
                         self.groupedLibraries = [:]
                     }
                 }
-                
+
                 return
             }
 
-            let libraries = await withTaskGroup {
+            let logger = self.logger
+            let libraries = await withTaskGroup(of: [Library]?.self) { group in
                 for connectionID in await PersistenceManager.shared.authorization.connectionIDs {
-                    $0.addTask { try? await ABSClient[connectionID].libraries() }
+                    group.addTask {
+                        do {
+                            return try await ABSClient[connectionID].libraries()
+                        } catch {
+                            logger.warning("Failed to fetch libraries for connection \(connectionID, privacy: .public): \(error, privacy: .public)")
+                            return nil
+                        }
+                    }
                 }
-                
-                return await $0.compactMap { $0 }.reduce([], +)
+
+                return await group.compactMap { $0 }.reduce([], +)
             }
-            
+
             await MainActor.run {
                 withAnimation {
                     self.libraries = libraries
