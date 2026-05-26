@@ -244,6 +244,7 @@ extension Satellite {
         case message(String)
 
         case playbackStartWhileDownloading(ItemIdentifier)
+        case downloadStartWhilePlaying
         case downloadRemoveWhilePlaying
 
         case convenienceDownloadManaged(ItemIdentifier)
@@ -257,6 +258,8 @@ extension Satellite {
 
                 case .playbackStartWhileDownloading:
                     String(localized: "warning.playbackDownload.activeDownload")
+                case .downloadStartWhilePlaying:
+                    String(localized: "warning.playbackDownload.activePlayback")
                 case .downloadRemoveWhilePlaying:
                     String(localized: "warning.playbackDownload.removeDownload")
 
@@ -801,6 +804,11 @@ extension Satellite {
                 return
             }
 
+            guard await AudioPlayer.shared.currentItemID != itemID else {
+                warn(.downloadStartWhilePlaying)
+                return
+            }
+
             startWorking(on: itemID)
 
             do {
@@ -1110,6 +1118,54 @@ private extension Satellite {
                     self?.upNextStrategy = nil
 
                     self?.bookmarks = []
+                }
+                Task {
+                    await PersistenceManager.shared.convenienceDownload.onPlaybackStopped()
+                }
+            }
+            .store(in: &observerSubscriptions)
+
+        // MARK: Playback-triggered download forwarding
+
+        AudioPlayer.shared.events.playbackItemChanged
+            .sink { itemID, _, _ in
+                Task {
+                    await PersistenceManager.shared.convenienceDownload.onPlaybackItemChanged(itemID: itemID)
+                }
+            }
+            .store(in: &observerSubscriptions)
+        AudioPlayer.shared.events.playStateChanged
+            .sink { isPlaying in
+                Task {
+                    await PersistenceManager.shared.convenienceDownload.onPlayStateChanged(isPlaying: isPlaying)
+                }
+            }
+            .store(in: &observerSubscriptions)
+        AudioPlayer.shared.events.durationsChanged
+            .sink { durations in
+                Task {
+                    await PersistenceManager.shared.convenienceDownload.onDurationsChanged(itemDuration: durations.0)
+                }
+            }
+            .store(in: &observerSubscriptions)
+        AudioPlayer.shared.events.currentTimesChanged
+            .sink { currentTimes in
+                Task {
+                    await PersistenceManager.shared.convenienceDownload.onCurrentTimesChanged(itemCurrentTime: currentTimes.0)
+                }
+            }
+            .store(in: &observerSubscriptions)
+        AudioPlayer.shared.events.queueChanged
+            .sink { queueIDs in
+                Task {
+                    await PersistenceManager.shared.convenienceDownload.onQueueChanged(queueIDs: queueIDs)
+                }
+            }
+            .store(in: &observerSubscriptions)
+        AudioPlayer.shared.events.upNextQueueChanged
+            .sink { upNextIDs in
+                Task {
+                    await PersistenceManager.shared.convenienceDownload.onUpNextQueueChanged(upNextIDs: upNextIDs)
                 }
             }
             .store(in: &observerSubscriptions)
