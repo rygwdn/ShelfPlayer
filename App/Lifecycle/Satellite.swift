@@ -609,14 +609,12 @@ extension Satellite {
     func setGain(_ gain: Percentage) {
         Task {
             await AudioPlayer.shared.setGain(gain)
-            notifySuccess.toggle()
         }
     }
 
     func setVocalBoost(_ boost: Percentage) {
         Task {
             await AudioPlayer.shared.setVocalBoost(boost)
-            notifySuccess.toggle()
         }
     }
 
