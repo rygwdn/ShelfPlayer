@@ -25,13 +25,12 @@ struct ConvenienceDownloadPreferences: View {
         List {
             Toggle("preferences.convenienceDownload.enable", isOn: $settings.enableConvenienceDownloads)
             Toggle("preferences.convenienceDownload.enableListenNowDownloads", isOn: $settings.enableListenNowDownloads)
+            Toggle("Auto-download during playback", isOn: $settings.enablePlaybackTriggeredDownloads)
 
             Section("preferences.convenienceDownload.configurations") {
                 ForEach(configurations) { configuration in
                     switch configuration {
                         case .listenNow:
-                            EmptyView()
-                        case .playbackTriggered:
                             EmptyView()
                         case .grouping(let itemID, let retrieval):
                             if loading[itemID] == true {

@@ -166,6 +166,18 @@ public final class AppSettings: @unchecked Sendable {
         didSet { suite.set(enableListenNowDownloads, forKey: "enableListenNowDownloads") }
     }
 
+    public var enablePlaybackTriggeredDownloads = false {
+        didSet { suite.set(enablePlaybackTriggeredDownloads, forKey: "enablePlaybackTriggeredDownloads") }
+    }
+
+    public var playbackDownloadTriggerDuration: Double = 300 {
+        didSet { suite.set(playbackDownloadTriggerDuration, forKey: "playbackDownloadTriggerDuration") }
+    }
+
+    public var playbackDownloadNearEndThreshold: Double = 600 {
+        didSet { suite.set(playbackDownloadNearEndThreshold, forKey: "playbackDownloadNearEndThreshold") }
+    }
+
     public var listenTimeTarget = 30 {
         didSet { suite.set(listenTimeTarget, forKey: "listenTimeTarget") }
     }
@@ -403,6 +415,9 @@ public final class AppSettings: @unchecked Sendable {
 
         enableConvenienceDownloads = suite.object(forKey: "enableConvenienceDownloads") as? Bool ?? true
         enableListenNowDownloads = suite.object(forKey: "enableListenNowDownloads") as? Bool ?? false
+        enablePlaybackTriggeredDownloads = suite.object(forKey: "enablePlaybackTriggeredDownloads") as? Bool ?? false
+        playbackDownloadTriggerDuration = suite.object(forKey: "playbackDownloadTriggerDuration") as? Double ?? 300
+        playbackDownloadNearEndThreshold = suite.object(forKey: "playbackDownloadNearEndThreshold") as? Double ?? 600
         listenTimeTarget = suite.object(forKey: "listenTimeTarget") as? Int ?? 30
 
         if let raw = suite.object(forKey: "defaultEpisodeSortOrder") as? Int,

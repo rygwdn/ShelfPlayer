@@ -40,6 +40,16 @@ extension PersistenceManager {
         var shouldComeToEnd = false
         var runExtendedBackgroundTask = false
 
+        // Playback-triggered download state
+        var playbackCurrentItemID: ItemIdentifier?
+        var playbackQueueIDs: [ItemIdentifier] = []
+        var playbackUpNextIDs: [ItemIdentifier] = []
+        var playbackDuration: TimeInterval?
+        var playbackAccumulatedListeningTime: TimeInterval = 0
+        var playbackListenStartDate: Date?
+        var playbackHasTriggeredCurrentDownload = false
+        var playbackHasTriggeredNextDownload = false
+
         func bootstrap() {
             setupObserverSubscriptions()
 
