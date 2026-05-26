@@ -541,6 +541,13 @@ private extension LocalAudioEndpoint {
                 throw error
             }
 
+            guard !audioTracks.isEmpty else {
+                activeOperationCount -= 1
+                logger.error("No audio tracks found for downloaded item")
+                UIApplication.shared.endBackgroundTask(task)
+                throw AudioPlayerError.loadFailed
+            }
+
             let capturedItemID = currentItemID
             Task { [weak self] in
                 guard let self, await OfflineMode.shared.isAvailable(capturedItemID.connectionID) else { return }
@@ -909,15 +916,11 @@ private extension LocalAudioEndpoint {
             ])
             let playerItem = AVPlayerItem(asset: asset)
 
-            audioPlayer.insert(playerItem, after: nil)
-
-            let capturedItem = playerItem
-            let capturedContext = audioProcessingContext
-            Task {
-                if let mix = await makeAudioMix(for: capturedItem, context: capturedContext) {
-                    capturedItem.audioMix = mix
-                }
+            if let mix = await makeAudioMix(for: playerItem, context: audioProcessingContext) {
+                playerItem.audioMix = mix
             }
+
+            audioPlayer.insert(playerItem, after: nil)
         }
     }
     func updateUpNextQueue(using forced: ResolvedUpNextStrategy? = nil) {
@@ -1062,7 +1065,7 @@ private extension LocalAudioEndpoint {
                         let localTracks = try await PersistenceManager.shared.download.audioTracks(for: itemID)
                         self.audioTracks = localTracks.sorted()
                         try await self.repopulateAudioPlayerQueue(start: self.activeAudioTrackIndex)
-                        try await self.seek(to: currentTime, insideChapter: false)
+                        try await self.seek(to: self.currentTime ?? currentTime, insideChapter: false)
                     } catch {
                         self.logger.warning("Failed to switch to local playback after download: \(error)")
                     }

@@ -55,8 +55,10 @@ extension PersistenceManager.ConvenienceDownloadSubsystem {
             await triggerDownloadIfNeeded(itemID: itemID)
         }
 
+        let nearEndThreshold = AppSettings.shared.playbackDownloadNearEndThreshold
         if !playbackHasTriggeredNextDownload,
-           currentTime >= duration - AppSettings.shared.playbackDownloadNearEndThreshold,
+           nearEndThreshold > 0,
+           currentTime >= duration - nearEndThreshold,
            let nextItemID = playbackQueueIDs.first ?? playbackUpNextIDs.first {
             playbackHasTriggeredNextDownload = true
             await triggerDownloadIfNeeded(itemID: nextItemID)

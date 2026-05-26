@@ -8,6 +8,7 @@
 import AVFoundation
 import Accelerate
 import MediaToolbox
+import os
 
 // MARK: - Biquad filter coefficients (normalized, direct form II transposed)
 
@@ -42,25 +43,31 @@ final class AudioProcessingContext: @unchecked Sendable {
     var gain: Float
     var vocalBoost: Float               // dB; 0 = off
     var sampleRate: Float               // set from the first prepare callback
-    var vocalBoostCoefficients: BiquadCoefficients
+
+    // Lock protects the 5-field struct from torn reads in the process callback.
+    private let coefficientsLock: OSAllocatedUnfairLock<BiquadCoefficients>
+
+    var vocalBoostCoefficients: BiquadCoefficients {
+        coefficientsLock.withLock { $0 }
+    }
 
     init(gain: Float, vocalBoost: Float) {
         self.gain = gain
         self.vocalBoost = vocalBoost
         self.sampleRate = 44100
-        self.vocalBoostCoefficients = .passthrough
+        self.coefficientsLock = OSAllocatedUnfairLock(initialState: .passthrough)
     }
 
     // Call on the main thread after changing vocalBoost or when sampleRate is first known.
-    // Not thread-safe vs. the process callback; the worst result is a brief click during transition.
     func updateVocalBoostCoefficients() {
         // Vocal presence range: centre 2500 Hz, Q 1.0 covers roughly 1 kHz – 6 kHz.
-        vocalBoostCoefficients = .peakingEQ(
+        let newCoeff = BiquadCoefficients.peakingEQ(
             frequency: 2500,
             sampleRate: sampleRate,
             Q: 1.0,
             dbGain: vocalBoost
         )
+        coefficientsLock.withLock { $0 = newCoeff }
     }
 }
 
